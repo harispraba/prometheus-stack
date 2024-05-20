@@ -79,3 +79,15 @@ docker run -d --name grafana \
 -v $(pwd)/datasource.yml:/etc/grafana/provisioning/datasources/datasource.yml \
 grafana/grafana:latest
 ```
+
+### Grafana PromQL to Get CPU Usage
+
+```sql
+100 - (avg by (instance) (irate(node_cpu_seconds_total{mode="idle"}[5m])) * 100)
+```
+
+### Grafana PromQL to Get Memory Usage
+
+```sql
+(node_memory_MemTotal_bytes - (node_memory_MemFree_bytes + node_memory_Buffers_bytes + node_memory_Cached_bytes)) / node_memory_MemTotal_bytes * 100
+```
