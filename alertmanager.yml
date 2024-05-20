@@ -10,7 +10,7 @@ route:
 receivers:
   - name: discord
     webhook_configs:
-      - url: "https://discord.com/api/webhooks/YOUR_WEBHOOK_ID/YOUR_WEBHOOK_TOKEN"
+      - url: "https://discord.com/api/webhooks/1234567890/abcdefghijklmnopqrstuvwxyz"
         send_resolved: true
 
 inhibit_rules:

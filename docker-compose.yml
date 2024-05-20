@@ -1,0 +1,86 @@
+version: "3.8"
+services:
+  node-exporter:
+    image: prom/node-exporter:v1.8.0
+    container_name: node-exporter
+    command:
+      - "--path.procfs=/host/proc"
+      - "--path.sysfs=/host/sys"
+      - "--path.rootfs=/rootfs"
+      - "--web.listen-address=:9100"
+      - "--web.telemetry-path=/metrics"
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/rootfs:ro
+    networks:
+      - monitoring
+    restart: unless-stopped
+
+  alertmanager:
+    image: prom/alertmanager:v0.27.0
+    container_name: alertmanager
+    volumes:
+      - alertmanager_data:/alertmanager
+      - "./alertmanager.yml:/etc/alertmanager/alertmanager.yml"
+    command:
+      - "--config.file=/etc/alertmanager/alertmanager.yml"
+      - "--storage.path=/alertmanager"
+      - "--web.listen-address=:9093"
+    networks:
+      - monitoring
+    depends_on:
+      - node-exporter
+    restart: unless-stopped
+
+  prometheus:
+    image: prom/prometheus:v2.52.0
+    container_name: prometheus
+    volumes:
+      - prometheus_data:/prometheus
+      - "./prometheus.yml:/etc/prometheus/prometheus.yml"
+      - "./alert_rules.yml:/etc/prometheus/alert_rules.yml"
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.path=/prometheus"
+      - "--web.console.libraries=/etc/prometheus/console_libraries"
+      - "--web.console.templates=/etc/prometheus/consoles"
+    networks:
+      - monitoring
+    restart: unless-stopped
+    depends_on:
+      - node-exporter
+      - alertmanager
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: grafana
+    ports:
+      - "3000:3000"
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - grafana_logs:/var/log/grafana
+      - "./grafana.ini:/etc/grafana/grafana.ini"
+      - "./datasource.yml:/etc/grafana/provisioning/datasources/datasource.yml"
+    depends_on:
+      - prometheus
+    networks:
+      - monitoring
+
+networks:
+  monitoring:
+    driver: bridge
+
+volumes:
+  alertmanager_data:
+    name: alertmanager_data
+    driver: local
+  prometheus_data:
+    name: prometheus_data
+    driver: local
+  grafana_data:
+    name: grafana_data
+    driver: local
+  grafana_logs:
+    name: grafana_logs
+    driver: local

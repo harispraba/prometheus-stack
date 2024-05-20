@@ -5,61 +5,77 @@ Simple Prometheus Stack
 ## Create monitoring network
 
 ```bash
-docker network create monitoring
+docker network create --driver bridge monitoring
+```
+
+## Create volumes
+
+```bash
+docker volume create --name alertmanager_data --driver local
+docker volume create --name prometheus_data --driver local
+docker volume create --name grafana_data --driver local
+docker volume create --name grafana_logs --driver local
 ```
 
 ## Node Exporter Install
 
 ```bash
-docker run \
--it \
--d \
+docker run -d --name node-exporter \
+--restart unless-stopped \
 --network monitoring \
--p 9100:9100 \
---name node-exporter \
--v /proc:/host/proc \
--v /sys:/host/sys \
--v /:/rootfs \
--v /etc/hostname:/etc/hostname \
+-v /proc:/host/proc:ro \
+-v /sys:/host/sys:ro \
+-v /:/rootfs:ro \
 prom/node-exporter:v1.8.0 \
---path.procfs /host/proc \
---path.sysfs /host/sys \
---collector.filesystem.mount-points-exclude=”^/(dev|proc|sys|var/lib/docker/.+|var/lib/kubelet/.+)($|/)” \
+--path.procfs=/host/proc \
+--path.sysfs=/host/sys \
+--path.rootfs=/rootfs \
+--web.listen-address=:9100 \
+--web.telemetry-path=/metrics
+--collector.filesystem.mount-points-exclude="^/(dev|proc|sys|var/lib/docker/.+|var/lib/kubelet/.+)($|/)" \
 --collector.textfile.directory /etc/node-exporter
 ```
 
 ## Alert Manager Install
 
 ```bash
-docker run \
+docker run -d --name alertmanager \
+--restart unless-stopped \
 --network monitoring \
---name alertmanager \
--d -p 9093:9093 \
--v ./alertmanager.yml:/etc/alertmanager/alertmanager.yml \
-prom/alertmanager:v0.27.0
+-v alertmanager_data:/alertmanager \
+-v $(pwd)/alertmanager.yml:/etc/alertmanager/alertmanager.yml \
+prom/alertmanager:v0.27.0 \
+--config.file=/etc/alertmanager/alertmanager.yml \
+--storage.path=/alertmanager \
+--web.listen-address=:9093
 ```
 
 ## Prometheus Install
 
 ```bash
-docker run \
+docker run -d --name prometheus \
+--restart unless-stopped \
 --network monitoring \
---name prometheus-server \
--d \
--p 9090:9090 \
--v “./prometheus.yml:/etc/prometheus/prometheus.yml” \
--v “./alert_rules.yml:/etc/prometheus/alert_rules.yml” \
-prom/prometheus:v2.52.0
+-v prometheus_data:/prometheus \
+-v $(pwd)/prometheus.yml:/etc/prometheus/prometheus.yml \
+-v $(pwd)/alert_rules.yml:/etc/prometheus/alert_rules.yml \
+prom/prometheus:v2.52.0 \
+--config.file=/etc/prometheus/prometheus.yml \
+--storage.tsdb.path=/prometheus \
+--web.console.libraries=/etc/prometheus/console_libraries \
+--web.console.templates=/etc/prometheus/consoles
 ```
 
 ## Grafana Install
 
 ```bash
-docker run \
---network monitoring \
---name grafana \
--d \
+docker run -d --name grafana \
+--restart unless-stopped \
 -p 3000:3000 \
--v ./grafana.ini:/etc/grafana/grafana.ini \
+--network monitoring \
+-v grafana_data:/var/lib/grafana \
+-v grafana_logs:/var/log/grafana \
+-v $(pwd)/grafana.ini:/etc/grafana/grafana.ini \
+-v $(pwd)/datasource.yml:/etc/grafana/provisioning/datasources/datasource.yml \
 grafana/grafana:latest
 ```
